@@ -3,10 +3,12 @@ import json
 import requests
 from openai import OpenAI
 
-# Hackathon required environment variables
+# --- HACKATHON REQUIRED ENVIRONMENT VARIABLES ---
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4-turbo")
-API_KEY = os.getenv("HF_TOKEN", "dummy-key-for-local-testing")
+HF_TOKEN = os.getenv("HF_TOKEN")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+# ----------------------------------------------
 
 # URL where your Docker container is running
 ENV_URL = "http://localhost:7860"
@@ -21,8 +23,9 @@ def log_end(success, steps, score, rewards):
     print(f"[END] success={success} steps={steps} score={score} rewards={rewards}", flush=True)
 
 def main():
-    # Initialize the LLM Client
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    # Initialize the LLM Client safely
+    api_key = os.getenv("OPENAI_API_KEY", "dummy-key-for-local-testing")
+    client = OpenAI(base_url=API_BASE_URL, api_key=api_key)
     
     # We will test Level 1 (The Deadlock)
     task_level = 1
@@ -31,8 +34,12 @@ def main():
     log_start(task=f"level-{task_level}", env="CloudOps-Triage", model=MODEL_NAME)
     
     # 1. Reset Environment to start the game
-    reset_resp = requests.post(f"{ENV_URL}/reset?task_level={task_level}")
-    obs = reset_resp.json()
+    try:
+        reset_resp = requests.post(f"{ENV_URL}/reset", params={"task_level": task_level})
+        obs = reset_resp.json()
+    except Exception as e:
+        log_end(success=False, steps=0, score=0.0, rewards=[])
+        return
     
     history = []
     rewards = []
@@ -61,15 +68,18 @@ def main():
             action_cmd = response.choices[0].message.content.strip().replace('"', '')
         except Exception as e:
             action_cmd = "WAIT"
-            error_msg = str(e)
             
         # 3. Take the Step in the Environment
-        step_resp = requests.post(f"{ENV_URL}/step", json={"command": action_cmd})
-        step_data = step_resp.json()
-        
-        obs = step_data["observation"]
-        reward = step_data["reward"]
-        done = step_data["done"]
+        try:
+            step_resp = requests.post(f"{ENV_URL}/step", json={"command": action_cmd})
+            step_data = step_resp.json()
+            
+            obs = step_data["observation"]
+            reward = step_data["reward"]
+            done = step_data["done"]
+        except Exception as e:
+            reward = -0.5
+            done = False
         
         rewards.append(reward)
         history.append(f"Step {step}: Commanded {action_cmd} -> Reward: {reward}")
