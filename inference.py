@@ -8,6 +8,9 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4-turbo")
 HF_TOKEN = os.getenv("HF_TOKEN")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
+# THE CRITICAL FIX: The exact proxy key the grader injects
+API_KEY = os.getenv("API_KEY", "dummy-key-for-local-testing")
 # ----------------------------------------------
 
 # URL where your Docker container is running
@@ -23,9 +26,8 @@ def log_end(success, steps, score, rewards):
     print(f"[END] success={success} steps={steps} score={score} rewards={rewards}", flush=True)
 
 def main():
-    # Initialize the LLM Client safely
-    api_key = os.getenv("OPENAI_API_KEY", "dummy-key-for-local-testing")
-    client = OpenAI(base_url=API_BASE_URL, api_key=api_key)
+    # Initialize the LLM Client using EXACTLY the variables from the email
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     
     # We will test Level 1 (The Deadlock)
     task_level = 1
